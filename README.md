@@ -50,9 +50,26 @@ The W&B integration adds rich, flexible experiment tracking and model versioning
   - wandb_run_name
   - wand_log_model: Log the model as artifact at the end of training (false by default)
 
-## Transformer Training Arguments
+## Transformer Training Arguments: [source](https://github.com/huggingface/transformers/blob/main/src/transformers/training_args.py)
 - evaluation_strategy (`str` or [`~trainer_utils.IntervalStrategy`], *optional*, defaults to `"no"`):
 The evaluation strategy to adopt during training. Possible values are:
   - `"no"`: No evaluation is done during training.
   - `"steps"`: Evaluation is done (and logged) every `eval_steps`.
   - `"epoch"`: Evaluation is done at the end of each epoch.
+- gradient_accumulation_steps (`int`, *optional*, defaults to 1):
+            Number of updates steps to accumulate the gradients for, before performing a backward/update pass.
+
+            When using gradient accumulation, one step is counted as one step with backward pass. Therefore, logging,
+            evaluation, save will be conducted every `gradient_accumulation_steps * xxx_step` training examples.
+- eval_delay (`float`, *optional*):
+            Number of epochs or steps to wait for before the first evaluation can be performed, depending on the
+            evaluation_strategy.
+- learning_rate (`float`, *optional*, defaults to 5e-5):
+            The initial learning rate for [`AdamW`] optimizer.
+- num_train_epochs(`float`, *optional*, defaults to 3.0):
+            Total number of training epochs to perform (if not an integer, will perform the decimal part percents of
+            the last epoch before stopping training).
+- max_steps (`int`, *optional*, defaults to -1):
+            If set to a positive number, the total number of training steps to perform. Overrides `num_train_epochs`.
+            In case of using a finite iterable dataset the training may stop before reaching the set number of steps
+            when all data is exhausted
