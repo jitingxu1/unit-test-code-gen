@@ -2,6 +2,9 @@
 
 ## Java unit test dataset
 [Methods2Test_java_unit_test_code](https://huggingface.co/datasets/jitx/Methods2Test_java_unit_test_code)
+
+## codellama
+
 To use this model, please make sure to install transformers from main until the next version is released:
 ```
 pip install git+https://github.com/huggingface/transformers.git@main
@@ -46,4 +49,10 @@ The W&B integration adds rich, flexible experiment tracking and model versioning
     - `all`: Log histograms of gradients and parameters
   - wandb_run_name
   - wand_log_model: Log the model as artifact at the end of training (false by default)
-3. 
+
+## Transformer Training Arguments
+- evaluation_strategy (`str` or [`~trainer_utils.IntervalStrategy`], *optional*, defaults to `"no"`):
+The evaluation strategy to adopt during training. Possible values are:
+  - `"no"`: No evaluation is done during training.
+  - `"steps"`: Evaluation is done (and logged) every `eval_steps`.
+  - `"epoch"`: Evaluation is done at the end of each epoch.
