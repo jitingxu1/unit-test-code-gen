@@ -1,11 +1,15 @@
 # unit-test-code-gen
 
-## Finetune llm to generate unit test code
+## Java unit test dataset
+[Methods2Test_java_unit_test_code](https://huggingface.co/datasets/jitx/Methods2Test_java_unit_test_code)
+
+
+## Finetune codellamma-7b to generate Java Junit test code
 
 To execute the fine-tuning script run the following command:
 
 ```
-python finetune/finetune.py \
+python src/finetune/finetune.py \
   --model_path="codellama/CodeLlama-7b-hf"\
   --dataset_name="jitx/Methods2Test_java_unit_test_code"\
   --split="train"\
@@ -21,5 +25,7 @@ python finetune/finetune.py \
   --lr_scheduler_type="cosine"\
   --num_warmup_steps 100\
   --weight_decay 0.05\
+  --use_wandb\
+  --wandb_run_name="finetune-codellama"\
   --output_dir="./checkpoints" \
 ```

@@ -143,7 +143,7 @@ class TrainLoraArguments:
     data_path: str = field(metadata={"help": "Dataset dir for training / eval "})
     output_dir: str = field(metadata={"help": "Output dir for checkpoint"})
     base_model: str = field(
-        default="TabbyML/J-350M", metadata={"help": "Base model for fine-tuning"}
+        default="codellama/CodeLlama-7b-hf", metadata={"help": "Base model for fine-tuning"}
     )
 
     batch_size: int = 128
@@ -226,11 +226,7 @@ def train(args):
     train_data = train_val["train"].shuffle()
     val_data = train_val["test"].shuffle()
 
-    trainer = Trainer(
-        model=model,
-        train_dataset=train_data,
-        eval_dataset=val_data,
-        args=TrainingArguments(
+    training_agrs = TrainingArguments(
             per_device_train_batch_size=args.micro_batch_size,
             gradient_accumulation_steps=gradient_accumulation_steps,
             warmup_steps=100,
@@ -244,8 +240,16 @@ def train(args):
             save_steps=args.eval_steps,
             output_dir=args.output_dir,
             save_total_limit=3,
+            report_to="wandb" if args.use_wandb else None,
+            run_name=args.wandb_run_name,
             load_best_model_at_end=True,
-        ),
+        )
+
+    trainer = Trainer(
+        model=model,
+        train_dataset=train_data,
+        eval_dataset=val_data,
+        args=training_agrs,
     )
     model.config.use_cache = False
 
