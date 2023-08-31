@@ -140,17 +140,37 @@ def create_datasets(tokenizer, args):
 
 @dataclass
 class TrainLoraArguments:
-    data_path: str = field(metadata={"help": "Dataset dir for training / eval "})
-    output_dir: str = field(metadata={"help": "Output dir for checkpoint"})
-    base_model: str = field(
-        default="codellama/CodeLlama-7b-hf", metadata={"help": "Base model for fine-tuning"}
+    data_path: str = field(
+      default="codellama/CodeLlama-7b-hf",
+      metadata={"help": "Dataset dir for training / eval "}
     )
+    output_dir: str = field(
+      default="./checkpoints",
+      metadata={"help": "Output dir for checkpoint"}
+    )
+    base_model: str = field(
+        default="codellama/CodeLlama-7b-hf",
+        metadata={"help": "Base model for fine-tuning"}
+    )
+
+    split: str = "train"
+    size_valid_set: int = 1000
+    streaming: bool = True
+    seq_length: int = 2048
+    max_steps: int = 10000
+    input_column_name: str = "src_fm"
+    output_column_name: str = "target"
+
 
     batch_size: int = 128
     micro_batch_size: int = 4
+    gradient_accumulation_steps: int = 16
     num_epochs: int = 3
     learning_rate: float = 3e-4
     cutoff_len: int = 256
+    lr_scheduler_type: str = "cosine"
+    num_warmup_steps: int = 100
+    weight_decay: float = 0.005
 
     # Evaluations
     val_set_size: int = 2000
@@ -169,14 +189,21 @@ class TrainLoraArguments:
     resume_from_checkpoint: str = None  # either training checkpoint or final adapter
     half: bool = True
 
+    #wandb
+    wandb_project: str = ""
+    wandb_run_name: str = ""
+    wandb_watch: str = "" # options: false | gradients | all
+    wandb_log_model: str = "end",  # options: false | true
+
+
 
 def parse_args() -> TrainLoraArguments:
     parser = HfArgumentParser(TrainLoraArguments)
     return parser.parse_args()
 
 def train(args):
-    gradient_accumulation_steps = args.batch_size // args.micro_batch_size
-
+    # gradient_accumulation_steps = args.batch_size // args.micro_batch_size
+    gradient_accumulation_steps = args.gradient_accumulation_steps
     model = AutoModelForCausalLM.from_pretrained(
         args.base_model, torch_dtype=torch.float16 if args.half else torch.float32
     )
@@ -194,10 +221,22 @@ def train(args):
 
     model = peft.get_peft_model(model, config)
 
-    data_files = glob.glob(os.path.join(args.data_path, "*.jsonl"))
-    print("Collected data files...", data_files)
-    dataset = load_dataset("json", data_files=data_files)["train"]
-    data = Dataset.from_generator(ConstantLengthDataset(tokenizer, dataset))
+
+    train_dataset = load_dataset(path=args.data_path, split="train").shuffle()
+    test_dataset = load_dataset(path=args.data_path, split="test").shuffle()
+    train_data = ConstantLengthDataset(
+      tokenizer,
+      train_dataset,
+      input_column_name="src_fm",
+      output_column_name="target"
+    )
+    test_data = ConstantLengthDataset(
+      tokenizer,
+      test_dataset,
+      input_column_name="src_fm",
+      output_column_name="target"
+    )
+
 
     resume_from_checkpoint = args.resume_from_checkpoint
     if resume_from_checkpoint:
@@ -220,11 +259,24 @@ def train(args):
 
     model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
 
-    train_val = data.train_test_split(
-        test_size=args.val_set_size, shuffle=True, seed=42
+    # train_val = data.train_test_split(
+    #     test_size=args.val_set_size, shuffle=True, seed=42
+    # )
+    # train_data = train_val["train"].shuffle()
+    # val_data = train_val["test"].shuffle()
+
+    # Check if parameter passed or if set within environ
+    use_wandb = len(args.wandb_project) > 0 or (
+        "WANDB_PROJECT" in os.environ and len(os.environ["WANDB_PROJECT"]) > 0
     )
-    train_data = train_val["train"].shuffle()
-    val_data = train_val["test"].shuffle()
+    # Only overwrite environ if wandb param passed
+    print("args.wandb_log_model=",args.wandb_log_model)
+    if len(args.wandb_project) > 0:
+        os.environ["WANDB_PROJECT"] = args.wandb_project
+    if len(args.wandb_watch) > 0:
+        os.environ["WANDB_WATCH"] = args.wandb_watch
+    if len(args.wandb_log_model) > 0:
+        os.environ["WANDB_LOG_MODEL"] = args.wandb_log_model
 
     training_agrs = TrainingArguments(
             per_device_train_batch_size=args.micro_batch_size,
@@ -236,11 +288,12 @@ def train(args):
             logging_steps=10,
             evaluation_strategy="steps",
             save_strategy="steps",
+            max_steps=args.max_steps,
             eval_steps=args.eval_steps,
             save_steps=args.eval_steps,
             output_dir=args.output_dir,
             save_total_limit=3,
-            report_to="wandb" if args.use_wandb else None,
+            report_to="wandb" if use_wandb else None,
             run_name=args.wandb_run_name,
             load_best_model_at_end=True,
         )
@@ -248,7 +301,7 @@ def train(args):
     trainer = Trainer(
         model=model,
         train_dataset=train_data,
-        eval_dataset=val_data,
+        eval_dataset=test_data,
         args=training_agrs,
     )
     model.config.use_cache = False
@@ -268,4 +321,5 @@ def train(args):
 
 if __name__ == "__main__":
     args = parse_args()
+    print(args)
     train(args)
