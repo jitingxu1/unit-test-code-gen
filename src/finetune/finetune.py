@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 import peft
+from peft import prepare_model_for_int8_training
 import torch
 from tqdm import tqdm
 from transformers import (
@@ -153,6 +154,8 @@ class TrainLoraArguments:
         metadata={"help": "Base model for fine-tuning"}
     )
 
+    load_in_8bit: bool = True
+
     split: str = "train"
     size_valid_set: int = 1000
     streaming: bool = True
@@ -205,7 +208,9 @@ def train(args):
     # gradient_accumulation_steps = args.batch_size // args.micro_batch_size
     gradient_accumulation_steps = args.gradient_accumulation_steps
     model = AutoModelForCausalLM.from_pretrained(
-        args.base_model, torch_dtype=torch.float16 if args.half else torch.float32
+        args.base_model,
+        load_in_8bit=args.load_in_8bit
+        torch_dtype=torch.float16 if args.half else torch.float32
     )
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model)
@@ -218,7 +223,7 @@ def train(args):
         bias="none",
         task_type=peft.TaskType.CAUSAL_LM,
     )
-
+    model = prepare_model_for_int8_training(model)
     model = peft.get_peft_model(model, config)
 
 
@@ -258,12 +263,6 @@ def train(args):
             print(f"Checkpoint {checkpoint_name} not found")
 
     model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
-
-    # train_val = data.train_test_split(
-    #     test_size=args.val_set_size, shuffle=True, seed=42
-    # )
-    # train_data = train_val["train"].shuffle()
-    # val_data = train_val["test"].shuffle()
 
     # Check if parameter passed or if set within environ
     use_wandb = len(args.wandb_project) > 0 or (

@@ -17,12 +17,12 @@ To execute the fine-tuning script run the following command:
 python src/finetune/finetune.py \
   --model_path="codellama/CodeLlama-7b-hf"\
   --dataset_name="jitx/Methods2Test_java_unit_test_code"\
-  --split="train"\
+  --load_in_8bit\
   --size_valid_set 10000\
   --streaming\
-  --seq_length 1024\
+  --seq_length 2048\
   --max_steps 10000\
-  --batch_size 1\
+  --batch_size 8\
   --input_column_name="src_fm"\
   --output_column_name="target"\ 
   --gradient_accumulation_steps 16\
